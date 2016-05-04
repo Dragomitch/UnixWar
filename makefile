@@ -19,10 +19,10 @@ TARGET= server client
 
 normal: $(TARGET)
 
-chatRoomServer: ChatRoomServer.c
+Server: Server.c 
 	gcc -Wall -Wextra server.c -o Server
 
-chatRoomClient: ChatRoomClient.c
+Client: Client.c
 	gcc -Wall -Wextra client.c -o Client
 
 clean:

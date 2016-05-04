@@ -15,6 +15,9 @@
  *
  * =====================================================================================
  */
+#ifndef CLIENT_H
+#define CLIENT_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -26,8 +29,10 @@
 #include <sys/socket.h>
 #include <time.h>
 #include "config.h"
+#include "client.h"
+#include "game.h"
+#endif
 
-#define PORT 5555
 #define BUFFERSIZE 1000
 #define NAMESIZE 20
 
@@ -73,7 +78,7 @@ void connectToServer(int *client_socket,char* serverIP,struct hostent *he,struct
 	}
 
 	serverAddress->sin_family = AF_INET;
-	serverAddress->sin_port = htons(PORT);
+	serverAddress->sin_port = htons(PORT_DIMOV);
 	serverAddress->sin_addr = *((struct in_addr*)he->h_addr);
 	memset(&(serverAddress->sin_zero), '\0', 8);
 
