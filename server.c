@@ -10,7 +10,7 @@
 #include <sys/wait.h>
 #include "config.h"
 
-#define PORT 5555 //TODO mettre le port correct
+#define PORT PORT_DIMOV //TODO mettre le port correct
 #define BUFFER_SIZE 1024
 #define BACKLOG 5
 #define COUNTDOWN 10 //30 seconds wait time
@@ -32,6 +32,7 @@ void alarm_handler(int signum) {
 	printf("alarm time !!\n");
 	if (signum == SIGALRM) {
 		time_is_up = TRUE;
+		alarm(0);
 	}
 }
 
@@ -61,8 +62,6 @@ void receive_message(int fd, fd_set *fds) {
 	} else {
 		printf("%s\n", client_message);
 	}
-	fflush(stdout);
-	fflush(stdin);
 }
 
 void add_new_client_socket(fd_set *fds, int *max_fd, int server_socket, struct sockaddr_in *client_address) {
@@ -79,6 +78,11 @@ void add_new_client_socket(fd_set *fds, int *max_fd, int server_socket, struct s
 				//first client, set an alarm for 30 seconds
 				struct sigaction action;
 				action.sa_handler = &alarm_handler;
+			printf("new player connected, %d players in total\n", num_clients_connected);
+			if (num_clients_connected == 0) {
+				//first client, set an alarm for 30 seconds
+				struct sigaction action;
+				action.sa_handler = alarm_handler;
 				sigaction(SIGALRM, &action, NULL);
 				alarm(COUNTDOWN);
 			} else if (num_clients_connected == 4) {
@@ -101,13 +105,14 @@ void add_new_client_socket(fd_set *fds, int *max_fd, int server_socket, struct s
 
 		} else {
 			char message[2];
-			sprintf(message, "%d", REFUSE);
+			sprintf(message, "%d", 2); //REFUSE dans le config.h
 			if (send(new_client_socket, message, sizeof(message), 0) == -1) {
 				perror("Send");
 			}
-			printf("refuse connection %d\n", REFUSE);
+			printf("refuse connection %d\n", 2);
 		}
 	}
+    }
 }
 
 void init_server_socket(int *server_socket,struct sockaddr_in *my_addr) {
@@ -215,6 +220,7 @@ int main() {
 			start_game(&fds, &max_fd, server_socket);
 			alarm(0);
 		}
+
 	}
 	close(server_socket); //tester la valeur de retour
 	return EXIT_SUCCESS;

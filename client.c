@@ -22,19 +22,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <string.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <time.h>
+#include <string.h>
 #include "config.h"
 #include "client.h"
 #include "game.h"
 #endif
 
 #define BUFFERSIZE 1000
-#define NAMESIZE 20
 
 typedef int bool;
 
@@ -89,21 +88,32 @@ void connectToServer(int *client_socket,char* serverIP,struct hostent *he,struct
 
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
+	if (argc != 3) {
+		fprintf(stderr, "Usage : Nom_serveur port\n");
+		return EXIT_FAILURE;
+	}
 	int client_socket,maxFD,i;
 	struct sockaddr_in serverAddress;// adresse du server
 	struct hostent *he;
 	fd_set fds,readfds;
 	char name[20];
+	int port = atoi(argv[3]);
 
-	if (argc != 2) {
-		fprintf(stderr, "Donner le nom du serveur en argument.\n");
+	create_nickname(name);
+	if( port != PORT_DRAGOMIR && port != PORT_DIMOV){
+		fprintf(stderr, "Le port devrait être l'un de ceux attribués dans le header");
 		return EXIT_FAILURE;
 	}
 
-	create_nickname(name);
 	connectToServer(&client_socket,argv[1],he,&serverAddress);
+	char* message_connection;
+	receive_message(client_socket, message_connection);
+	strtok(message_connection, " ");
+	if( message_connection  [0] == DISCONNECT){
+		// Le serveur n'accepte pas notre raison pour une quelconque raison
+		printf("La connexion a été refusée par le serveur.\n...Fin du programme...\n");
+	}
 
 	FD_ZERO(&fds);
 	FD_ZERO(&readfds);
