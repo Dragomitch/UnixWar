@@ -58,10 +58,12 @@ void send_message(int client_socket){
 }
 
 void create_nickname(char *name){
+	printf("ok\n");
 	char* request="Entrer votre pseudonyme (20 lettres): ";
 	int valid=0;
 	printf("%s",request);
 	name = fgets(name, NAMESIZE, stdin);
+	printf("ok1\n");
 	printf("\n");
 }
 
@@ -98,7 +100,7 @@ int main(int argc, char *argv[]){
 	struct hostent *he;
 	fd_set fds,readfds;
 	char name[20];
-	int port = atoi(argv[3]);
+	int port = atoi(argv[2]);
 
 	create_nickname(name);
 	if( port != PORT_DRAGOMIR && port != PORT_DIMOV){
