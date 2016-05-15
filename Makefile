@@ -1,29 +1,24 @@
-#
-# =====================================================================================
-#
-#       Filename:  makefile
-#
-#    Description:  fichier générant et gérant les dépendances du projet
-#
-#        Version:  1.0
-#        Created:  05/04/2016 03:54:34 PM
-#       Revision:  1
-#       Compiler:  cc
-#
-#         Author:  DIMOV Theodor, DRAGOMIR Philippe
-#   Organization:  IPL-Student
-#
-# =====================================================================================
-#
 TARGET= server client
 
 normal: $(TARGET)
 
-Server: Server.c 
-	gcc -Wall -Wextra server.c -o Server
+server: server.o common_utils.o cards.o
+	gcc -Wall -Wextra server.o common_utils.o cards.o -o server
 
-Client: Client.c
-	gcc -Wall -Wextra client.c -o Client
+client: client.o common_utils.o cards.o
+	gcc -Wall -Wextra client.o common_utils.o cards.o -o client
+
+server.o: server.c common_utils.h cards.h
+	gcc -Wall -Wextra -c server.c
+
+client.o: client.c common_utils.h cards.h
+	gcc -Wall -Wextra -c client.c
+
+common_utils.o:	common_utils.h common_utils.c
+	gcc -c common_utils.c
+
+cards.o: cards.h cards.c
+	gcc -c cards.c
 
 clean:
 	$(RM) $(TARGET)

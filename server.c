@@ -1,121 +1,94 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/wait.h>
-#include "config.h"
+#include "server.h"
 
-#define PORT PORT_DIMOV //TODO mettre le port correct
-#define BUFFER_SIZE 1024
-#define BACKLOG 5
-#define COUNTDOWN 10 //30 seconds wait time
-
-#define TRUE 1
-#define FALSE 0
-
-#define MAX_PLAYERS 4
-
-typedef int bool;
-
-int num_clients_connected;
-char client_sockets[MAX_PLAYERS];
-int round_number;
+int cl_count;
+int cl_sockets[MAX_PLAYERS];
+char cl_nicknames[MAX_PLAYERS][20];
 bool game_in_progress;
 bool time_is_up;
+bool running;
+
+fct_ptr dispatcher[] = { add_player, refuse_connection, add_nickname };
+
+int main(int argc, char** argv) {
+	int server_socket, max_fd, i;
+	struct sockaddr_in my_addr, cl_addr;
+	fd_set fds;
+	char ask_msg[3]; //les codes des messages prennen au maximum 2 caractères
+	sprintf(ask_msg, "%d", ASK);
+
+	for (i = 0; i < MAX_PLAYERS; i++) {
+		cl_sockets[i] = 0;
+	}
+
+	cl_count = 0;
+	game_in_progress = FALSE;
+	time_is_up = FALSE;
+	running = TRUE;
+
+	struct sigaction alarm, interrupt;
+	alarm.sa_handler = &alarm_handler;
+	interrupt.sa_handler = &interrupt_handler;
+	sigaction(SIGALRM, &alarm, NULL);
+	sigaction(SIGINT, &interrupt, NULL);
+
+	init_server(&server_socket, &my_addr);
+
+	while (running) {
+		FD_ZERO(&fds);
+		FD_SET(server_socket, &fds);
+		max_fd = server_socket + 1;
+		int i;
+		for (i = 0; i < MAX_PLAYERS; i++) {
+			if (cl_sockets[i] > 0) {
+				FD_SET(cl_sockets[i], &fds);
+			}
+			if (cl_sockets[i] >= max_fd) {
+				max_fd = cl_sockets[i]+1;
+			}
+		}
+		printf("number of clients : %d\n", cl_count);
+		printf("game in progress : %d\n", game_in_progress);
+		if ((select(max_fd, &fds, NULL, NULL, NULL)) < 0) {
+			//errno is set to EINTR when select() is interrupted by a signal, in our case, the alarm
+			if (errno != EINTR) {
+				return EXIT_FAILURE;
+			}
+		}
+		if (FD_ISSET(server_socket, &fds)) {
+			add_client(server_socket, &cl_addr);
+		}
+
+		for (i = 0; i < cl_count; i++) {
+			if (FD_ISSET(cl_sockets[i], &fds)) {
+				receive_message(cl_sockets[i]);
+			}
+		}
+		if (game_in_progress) {
+			broadcast(ask_msg); //demander aux joueurs de jouer leur carte
+		}
+	}
+	shutdown_socket(server_socket);
+	return EXIT_SUCCESS;
+}
 
 void alarm_handler(int signum) {
-	printf("alarm time !!\n");
 	if (signum == SIGALRM) {
-		time_is_up = TRUE;
-		alarm(0);
-	}
-}
-
-void receive_message(int fd, fd_set *fds) {
-	char client_message[BUFFER_SIZE];
-	int bytes_received;
-	if ((bytes_received = recv(fd, client_message, BUFFER_SIZE, 0)) <= 0) {
-		if (bytes_received == 0) {
-			printf("Client disconnected.\n");
-		}
-		else {
-			perror("Could not read message");
-		}
-			close(fd);
-			//FD_CLR(fd,fds); pointless since it is zeroed on every loop turn
-			int i;
-			for (i = 0; i < num_clients_connected; i++) {
-				if (client_sockets[i] == fd) {
-					int j;
-					for (j = i+1; j < num_clients_connected; j++) {
-						client_sockets[j-1] = client_sockets[j];
-					}
-					break;
-				}
-			}
-			num_clients_connected--;
-	} else {
-		printf("%s\n", client_message);
-	}
-}
-
-void add_new_client_socket(fd_set *fds, int *max_fd, int server_socket, struct sockaddr_in *client_address) {
-	int new_client_socket;
-	int client_address_length = sizeof(struct sockaddr_in);
-	if ((new_client_socket = accept(server_socket, (struct sockaddr *)client_address, (socklen_t*) &client_address_length)) == -1) {
-		perror("Connection error");
-		exit(EXIT_FAILURE);
-	} else {
-
-		if (!game_in_progress && num_clients_connected < 4) {
-			printf("new player connected, %d players in total\n", num_clients_connected+1);
-			if (num_clients_connected == 0) {
-				//first client, set an alarm for 30 seconds
-				struct sigaction action;
-				action.sa_handler = &alarm_handler;
-			printf("new player connected, %d players in total\n", num_clients_connected);
-			if (num_clients_connected == 0) {
-				//first client, set an alarm for 30 seconds
-				struct sigaction action;
-				action.sa_handler = alarm_handler;
-				sigaction(SIGALRM, &action, NULL);
-				alarm(COUNTDOWN);
-			} else if (num_clients_connected == 4) {
-				alarm(0);
-			}
-			FD_SET(new_client_socket, fds);
-			client_sockets[num_clients_connected] = new_client_socket;
-			if (new_client_socket > *max_fd) {
-				*max_fd = new_client_socket+1;
-			}
-			num_clients_connected++;
-			char message[5];
-			sprintf(message, "%d %d", WAIT, COUNTDOWN);
-			if (send(new_client_socket, message, sizeof(message), 0) == -1) {
-				perror("Send");
-			} else {
-				printf("Message sent !!!\n");
-			}
-			printf("new connection accept + %d: %s\n", WAIT, inet_ntoa(client_address->sin_addr));
-
+		if (cl_count < 2) {
+			clear_lobby();
 		} else {
-			char message[2];
-			sprintf(message, "%d", 2); //REFUSE dans le config.h
-			if (send(new_client_socket, message, sizeof(message), 0) == -1) {
-				perror("Send");
-			}
-			printf("refuse connection %d\n", 2);
+			start_game();
 		}
+		time_is_up = TRUE;
 	}
-    }
 }
 
-void init_server_socket(int *server_socket,struct sockaddr_in *my_addr) {
+void interrupt_handler(int signum) {
+	if (signum == SIGINT) {
+		shutdown_server();
+	}
+}
+
+void init_server(int *server_socket,struct sockaddr_in *my_addr) {
 
 	if ((*server_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		perror("Socket");
@@ -133,95 +106,171 @@ void init_server_socket(int *server_socket,struct sockaddr_in *my_addr) {
 		exit(EXIT_FAILURE);
 	}
 
-	if (listen(*server_socket, BACKLOG) == -1) {
+	if (listen(*server_socket, BACKLOG)) {
 		perror("Listen");
 		exit(EXIT_FAILURE);
 	}
-	fflush(stdout);//on vide le buffer
 }
 
-void notify_game_over(fd_set* fds, int* max_fd, int server_socket) {
-	printf("notifying ..\n");
+void add_client(int server_socket, struct sockaddr_in *cl_addr) {
+	int new_cl_socket;
+	int cl_addr_length = sizeof(struct sockaddr_in);
+	if ((new_cl_socket = accept(server_socket, (struct sockaddr *)cl_addr, (socklen_t*) &cl_addr_length)) == -1) {
+		perror("Connection error");
+		exit(EXIT_FAILURE);
+	} else {
+		//either accept or refuse the connection
+		dispatcher[(game_in_progress || cl_count == MAX_PLAYERS)] (new_cl_socket) ;
+		//le résultat de la condition booléenne sert comme indice du tableau pour appeler la bonne fonction et lui passer le socket en paramètre
+	}
+}
+
+void add_player(int socket) {
+	cl_sockets[cl_count++] = socket;
+	char message[5];
+	sprintf(message, "%d %d", WAIT, COUNTDOWN);
+	send_message_(message, socket);
+	if (cl_count == 1) {
+		//first client, set an alarm for 30 seconds
+		alarm(COUNTDOWN);
+	}
+}
+
+void remove_player(int index) {
+	shutdown_socket(cl_sockets[index]);
+	memcpy(cl_nicknames[index], "\0", 20);
+	cl_sockets[index] = 0;
+	cl_count--;
+}
+
+void refuse_connection(int socket) {
+	char message[2];
+	sprintf(message, "%d", REFUSE);
+	send_message_(message, socket);
+}
+
+void add_nickname(int socket, char** message) {
+	printf("nickname : %s\n", *message);
+	char* nickname;
+	extract_player_nickname(message, &nickname);
+	int i;
+	for (i = 0; i < cl_count; i++) {
+		if (cl_sockets[i] == socket) {
+			sprintf(cl_nicknames[i], "%s", nickname);
+			printf("added a player nickname : %s\n", cl_nicknames[i]);
+			break;
+		}
+	}
+	free(nickname);
+}
+
+void deal_cards() {
+	srand(time(NULL));
+	int cards_per_player = DECK_SIZE / cl_count;
+	int dealt_cards[cards_per_player * cl_count];
+	int total_dealt_cards = 0;
+	char tmp[3];
+	int player;
+	for (player = 0; player < cl_count; player++) {
+		int card;
+		//prepare message head
+		sprintf(tmp, "%d ", DEAL);
+		char message[strlen(tmp) + 3* cards_per_player]; //2 caractèress par carte + 1 espace
+		message[0] = '\0';
+		strcat(message, tmp);
+		//prepare message body
+		for (card = 0; card < cards_per_player; card++) {
+			int random_card;
+			do {
+				random_card = rand_range(DECK_SIZE);
+				//choisir une carte tant qu'on n'en trouve pas une qui n'a pas encore été choisie
+			} while (array_contains(dealt_cards, random_card, total_dealt_cards));
+			//rajouter la carte au message
+			sprintf(tmp, "%d ", random_card);
+			strcat(message, tmp);
+			dealt_cards[total_dealt_cards++] = random_card;
+		}
+		//distribuer les cartes choisies au joueur
+		send_message_(message, cl_sockets[player]);
+		printf("cards sent : \n");
+		printf("%s\n", message);
+	}
+}
+
+void clear_lobby() {
 	char message[2];
 	sprintf(message, "%d", DISCONNECT);
+	broadcast(message);
+	game_in_progress = FALSE;
 	int i;
-	for (i = 0; i < num_clients_connected; i++) {
-		if (send(client_sockets[i], message, sizeof(message), 0) == -1) {
-			perror("Send");
+	for (i = 0; i < cl_count; i++) {
+		if (cl_sockets[i] > 0) {
+			remove_player(i);
 		}
-		client_sockets[i] = 0;
 	}
-	num_clients_connected = 0;
-	time_is_up = FALSE;
 }
 
-void start_game(fd_set* fds, int* max_fd, int server_socket) {
+void broadcast(char* message) {
+	int i;
+	for (i = 0; i < MAX_PLAYERS; i++) {
+		if (cl_sockets[i] != 0) {
+			send_message_(message, cl_sockets[i]);
+		}
+	}
+}
+
+void receive_message(int fd) {
+	char* message;
+	if (!(message = (char*) malloc(BUFFER_SIZE * sizeof(char)))) {
+		perror("malloc");
+	}
+	char* backup = message;
+	int bytes_received;
+	if ((bytes_received = recv(fd, message, BUFFER_SIZE, 0)) <= 0) {
+		if (bytes_received == 0) {
+			printf("Client disconnected.\n");
+		}
+		else {
+			perror("Could not read message");
+		}
+			int i;
+			for (i = 0; i < cl_count; i++) {
+				if (cl_sockets[i] == fd) {
+					remove_player(i);
+					int j;
+					for (j = i+1; j <= cl_count; j++) { //on vient de supprimer un joueur, cl_count a été décrémenté --> '<='
+						cl_sockets[j-1] = cl_sockets[j];
+						sprintf(cl_nicknames[j-1], "%s", cl_nicknames[j]);
+					}
+					break;
+				}
+			}
+	} else {
+		dispatcher[extract_message_code(&message)] (fd, &message);
+	}
+	free(backup);
+}
+
+void start_game() {
 	printf("game starting!\n");
-	//TODO perform necessary treatments to start the game
+	char message[3];
+	sprintf(message, "%d", ROUND);
+	broadcast(message);
+	deal_cards();
 	game_in_progress = TRUE;
 }
 
-int main() {
-	int server_socket, fd, max_fd, i;
-	struct sockaddr_in my_addr, client_addr;
-	fd_set fds;
-
-	init_server_socket(&server_socket, &my_addr);
-
-	for (i = 0; i < MAX_PLAYERS; i++) {
-		client_sockets[i] = 0;
+void shutdown_socket(int socket) {
+	printf("Shutting down socket number %d\n", socket);
+	if (shutdown(socket, SHUT_RDWR) < 0) {
+		perror("Socket shutdown");
+		exit(EXIT_FAILURE);
 	}
+}
 
-	num_clients_connected = 0;
-	round_number = 0;
-	game_in_progress = FALSE;
-	time_is_up = FALSE;
-
-	while (TRUE) {
-		FD_ZERO(&fds);
-		FD_SET(server_socket, &fds);
-		max_fd = server_socket + 1;
-		int i;
-		for (i = 0; i < MAX_PLAYERS; i++) {
-			if (client_sockets[i] != server_socket) {
-				FD_SET(client_sockets[i], &fds);
-			}
-			if (client_sockets[i] > max_fd) {
-				max_fd = client_sockets[i]+1;
-			}
-		}
-		if ((select(max_fd, &fds, NULL, NULL, NULL)) < 0) {
-			//errno is set to EINTR when select() is interrupted by a signal, in our case, the alarm
-			if (errno != EINTR) {
-				return EXIT_FAILURE;
-			}
-		}
-		if (FD_ISSET(server_socket, &fds)) {
-			printf("socket set (master) : %d\n", server_socket);
-			add_new_client_socket(&fds, &max_fd, server_socket, &client_addr);
-		}
-
-		for (fd = 0; fd < num_clients_connected; fd++) {
-			printf("reading what the dumbass has to say.. \n");
-			if (FD_ISSET(client_sockets[fd], &fds)) {
-				printf("socket set : %d at index %d\n", client_sockets[fd], fd);
-				receive_message(client_sockets[fd], &fds);
-			}
-		}
-
-		if (!game_in_progress && time_is_up) {
-			if (num_clients_connected < 2) {
-				notify_game_over(&fds, &max_fd, server_socket);
-			} else {
-				start_game(&fds, &max_fd, server_socket);
-			}
-			time_is_up = FALSE;
-		} else if (!game_in_progress && num_clients_connected == MAX_PLAYERS) {
-			start_game(&fds, &max_fd, server_socket);
-			alarm(0);
-		}
-
-	}
-	close(server_socket); //tester la valeur de retour
-	return EXIT_SUCCESS;
+void shutdown_server() {
+	printf("server shutting down ..\n");
+	clear_lobby();
+	running = FALSE;
+	//free shared memory
 }
