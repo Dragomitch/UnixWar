@@ -23,11 +23,12 @@
 #include <sys/socket.h>
 #include "config.h"
 
-void send_message_(char*, int);
-int extract_message_code( char** );
-int decode_message_payload( char**, int**, int );
-void extract_player_nickname( char**, char** );
-int rand_range(int);
-bool array_contains(int*, int, int);
+#define MESSAGE_SIZE 82
+void send_msg( int, const char*, int );
+int extract_msg_code( char** );
+int decode_msg_payload( char**, int*, int );
+void extract_player_nickname( char**, char* );
+int rand_range( int );
+bool array_contains( int*, int, int );
 
 #endif

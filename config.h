@@ -37,3 +37,6 @@ typedef int bool;
 //ports
 #define PORT_DIMOV 	17626
 #define PORT_DRAGOMIR 	18206
+
+#define MAX_PLAYERS 4
+#define NAMESIZE 20

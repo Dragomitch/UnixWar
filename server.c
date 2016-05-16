@@ -6,15 +6,15 @@ char cl_nicknames[MAX_PLAYERS][20];
 bool game_in_progress;
 bool time_is_up;
 bool running;
+bool end_of_turn;
 
-fct_ptr dispatcher[] = { add_player, refuse_connection, add_nickname };
+fct_ptr dispatcher[] = { add_player, refuse_connection, add_nickname, 0, 0, 0, receive_card, 0, end_round };
 
 int main(int argc, char** argv) {
-	int server_socket, max_fd, i;
+	int server_socket, max_fd, select_res, i;
 	struct sockaddr_in my_addr, cl_addr;
+	struct timeval timeout = {0, 15000}; //15 milliseconds
 	fd_set fds;
-	char ask_msg[3]; //les codes des messages prennen au maximum 2 caractères
-	sprintf(ask_msg, "%d", ASK);
 
 	for (i = 0; i < MAX_PLAYERS; i++) {
 		cl_sockets[i] = 0;
@@ -46,25 +46,30 @@ int main(int argc, char** argv) {
 				max_fd = cl_sockets[i]+1;
 			}
 		}
-		printf("number of clients : %d\n", cl_count);
-		printf("game in progress : %d\n", game_in_progress);
-		if ((select(max_fd, &fds, NULL, NULL, NULL)) < 0) {
+		if ((select_res = select(max_fd, &fds, NULL, NULL, &timeout)) < 0) {
 			//errno is set to EINTR when select() is interrupted by a signal, in our case, the alarm
 			if (errno != EINTR) {
 				return EXIT_FAILURE;
 			}
 		}
-		if (FD_ISSET(server_socket, &fds)) {
-			add_client(server_socket, &cl_addr);
-		}
 
-		for (i = 0; i < cl_count; i++) {
-			if (FD_ISSET(cl_sockets[i], &fds)) {
-				receive_message(cl_sockets[i]);
+		if (select_res >= 0 && select_res != 0) {
+			for (i = 0; i < max_fd; i++) {
+				if (FD_ISSET(i, &fds)) {
+					if (i == server_socket) {
+						printf("going in .. \n");
+						add_client(server_socket, &cl_addr);
+					} else {
+						receive_msg(i);
+					}
+				}
 			}
 		}
 		if (game_in_progress) {
-			broadcast(ask_msg); //demander aux joueurs de jouer leur carte
+			if (end_of_turn) {
+				end_of_turn = FALSE;
+				broadcast(ASK, "");
+			}
 		}
 	}
 	shutdown_socket(server_socket);
@@ -115,7 +120,7 @@ void init_server(int *server_socket,struct sockaddr_in *my_addr) {
 void add_client(int server_socket, struct sockaddr_in *cl_addr) {
 	int new_cl_socket;
 	int cl_addr_length = sizeof(struct sockaddr_in);
-	if ((new_cl_socket = accept(server_socket, (struct sockaddr *)cl_addr, (socklen_t*) &cl_addr_length)) == -1) {
+	if ((new_cl_socket = accept(server_socket, (struct sockaddr *)cl_addr, (socklen_t*) &cl_addr_length)) < 0) {
 		perror("Connection error");
 		exit(EXIT_FAILURE);
 	} else {
@@ -127,9 +132,10 @@ void add_client(int server_socket, struct sockaddr_in *cl_addr) {
 
 void add_player(int socket) {
 	cl_sockets[cl_count++] = socket;
-	char message[5];
-	sprintf(message, "%d %d", WAIT, COUNTDOWN);
-	send_message_(message, socket);
+	printf("adding!\n");
+	char countdown[2];
+	sprintf(countdown, "%d", COUNTDOWN);
+	send_msg(WAIT, countdown, socket);
 	if (cl_count == 1) {
 		//first client, set an alarm for 30 seconds
 		alarm(COUNTDOWN);
@@ -144,15 +150,13 @@ void remove_player(int index) {
 }
 
 void refuse_connection(int socket) {
-	char message[2];
-	sprintf(message, "%d", REFUSE);
-	send_message_(message, socket);
+	send_msg(REFUSE, "", socket);
 }
 
-void add_nickname(int socket, char** message) {
-	printf("nickname : %s\n", *message);
-	char* nickname;
-	extract_player_nickname(message, &nickname);
+void add_nickname(int socket, char** msg) {
+	printf("nickname : %s\n", *msg);
+	char nickname[NAMESIZE];
+	extract_player_nickname(msg, nickname);
 	int i;
 	for (i = 0; i < cl_count; i++) {
 		if (cl_sockets[i] == socket) {
@@ -161,7 +165,6 @@ void add_nickname(int socket, char** message) {
 			break;
 		}
 	}
-	free(nickname);
 }
 
 void deal_cards() {
@@ -169,16 +172,12 @@ void deal_cards() {
 	int cards_per_player = DECK_SIZE / cl_count;
 	int dealt_cards[cards_per_player * cl_count];
 	int total_dealt_cards = 0;
-	char tmp[3];
 	int player;
 	for (player = 0; player < cl_count; player++) {
 		int card;
-		//prepare message head
-		sprintf(tmp, "%d ", DEAL);
-		char message[strlen(tmp) + 3* cards_per_player]; //2 caractèress par carte + 1 espace
-		message[0] = '\0';
-		strcat(message, tmp);
-		//prepare message body
+		int str_length = 0;
+		char msg[3* cards_per_player]; //2 caractèress par carte + 1 espace
+		msg[0] = '\0';
 		for (card = 0; card < cards_per_player; card++) {
 			int random_card;
 			do {
@@ -186,21 +185,18 @@ void deal_cards() {
 				//choisir une carte tant qu'on n'en trouve pas une qui n'a pas encore été choisie
 			} while (array_contains(dealt_cards, random_card, total_dealt_cards));
 			//rajouter la carte au message
-			sprintf(tmp, "%d ", random_card);
-			strcat(message, tmp);
+			str_length += sprintf(msg+str_length, "%d ", random_card);
 			dealt_cards[total_dealt_cards++] = random_card;
 		}
 		//distribuer les cartes choisies au joueur
-		send_message_(message, cl_sockets[player]);
-		printf("cards sent : \n");
-		printf("%s\n", message);
+		send_msg(DEAL, msg, cl_sockets[player]);
+		printf("cards dealt : \n");
+		printf("%s\n", msg);
 	}
 }
 
 void clear_lobby() {
-	char message[2];
-	sprintf(message, "%d", DISCONNECT);
-	broadcast(message);
+	broadcast(DISCONNECT, "");
 	game_in_progress = FALSE;
 	int i;
 	for (i = 0; i < cl_count; i++) {
@@ -210,23 +206,25 @@ void clear_lobby() {
 	}
 }
 
-void broadcast(char* message) {
+void broadcast(int msg_code, char* payload) {
+	char msg[MESSAGE_SIZE];
+	sprintf(msg, "%d %s", msg_code, payload);
 	int i;
 	for (i = 0; i < MAX_PLAYERS; i++) {
 		if (cl_sockets[i] != 0) {
-			send_message_(message, cl_sockets[i]);
+			if (send(cl_sockets[i], msg, MESSAGE_SIZE, 0) == -1) {
+				perror("Send");
+				exit(EXIT_FAILURE);
+			}
 		}
 	}
 }
 
-void receive_message(int fd) {
-	char* message;
-	if (!(message = (char*) malloc(BUFFER_SIZE * sizeof(char)))) {
-		perror("malloc");
-	}
-	char* backup = message;
+void receive_msg(int fd) {
+	char msg[MESSAGE_SIZE];
+	char* msg_ptr = msg;
 	int bytes_received;
-	if ((bytes_received = recv(fd, message, BUFFER_SIZE, 0)) <= 0) {
+	if ((bytes_received = recv(fd, msg, MESSAGE_SIZE, 0)) <= 0) {
 		if (bytes_received == 0) {
 			printf("Client disconnected.\n");
 		}
@@ -246,18 +244,22 @@ void receive_message(int fd) {
 				}
 			}
 	} else {
-		dispatcher[extract_message_code(&message)] (fd, &message);
+		printf("message : %s\n", msg_ptr);
+		int msg_code = extract_msg_code(&msg_ptr);
+		dispatcher[msg_code] (fd, &msg_ptr);
 	}
-	free(backup);
 }
 
 void start_game() {
-	printf("game starting!\n");
-	char message[3];
-	sprintf(message, "%d", ROUND);
-	broadcast(message);
+	broadcast(ROUND, "");
 	deal_cards();
+	start_round();
 	game_in_progress = TRUE;
+}
+
+void start_round() {
+	end_of_turn = FALSE;
+	broadcast(ASK, "");
 }
 
 void shutdown_socket(int socket) {
@@ -272,5 +274,44 @@ void shutdown_server() {
 	printf("server shutting down ..\n");
 	clear_lobby();
 	running = FALSE;
-	//free shared memory
+	//free shared memory (allocate some first)
+}
+
+void receive_card(int socket, char** msg) {
+	static int received_cards_count = 0;
+	static int highest_card = -1;
+	static int highest_card_holder = -1;
+	static int str_length = 0;
+	static char cards[MAX_PLAYERS * 3];
+	int card_container[1];
+	int* card = card_container;
+	decode_msg_payload(msg, card, 1);
+	str_length += sprintf(cards+str_length, "%d ", *card);
+	int i;
+	for ( i = 0; i < cl_count; i++) {
+		if (cl_sockets[i] == socket) {
+			printf("%s played the %s with id %d\n", cl_nicknames[i], get_card_name(*card), *card);
+			if (*card > highest_card) {
+				highest_card = *card;
+				highest_card_holder = i;
+			}
+		}
+	}
+	received_cards_count++;
+	if (received_cards_count == cl_count) {
+		send_msg(GIVE, cards, cl_sockets[highest_card_holder]);
+		printf("player %s wins : %s\n", cl_nicknames[highest_card_holder], cards);
+		received_cards_count = 0;
+		highest_card = -1;
+		highest_card_holder = -1;
+		memset(cards, 0, cl_count * sizeof(int));
+		str_length = 0;
+		end_of_turn = TRUE;
+	}
+	char buffer[10];
+	fgets(buffer, 10, stdin);
+}
+
+void end_round(int socket, char** msg) {
+	printf("end of round !\n");
 }

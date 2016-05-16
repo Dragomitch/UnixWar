@@ -72,12 +72,13 @@ char* card_names[] = {
 	"Ace of Hearts"
 };
 
-int card_points[] = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 1 };
-
 char* get_card_name(int card) {
 	return card_names[card];
 }
 
 int get_card_points(int card) {
-	return card_points[card / 4];
+	if (card > 47) {
+		return 1;
+	}
+	return (card / 4) + 2;
 }

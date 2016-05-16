@@ -16,8 +16,11 @@
  */
 #include "common_utils.h"
 
-void send_message_(char* message, int socket) {
-	if (send(socket, message, strlen(message), 0) == -1) {
+void send_msg(int msg_code, const char* payload, int socket) {
+	char msg[MESSAGE_SIZE];
+	sprintf(msg, "%d %s", msg_code, payload);
+	printf("sending msg : %s\n", msg);
+	if (send(socket, msg, MESSAGE_SIZE, 0) == -1) {
 		perror("Send");
 		exit(EXIT_FAILURE);
 	}
@@ -26,13 +29,13 @@ void send_message_(char* message, int socket) {
 /* *
  * extracts the message code header from the rest of the message.
  *
- * message : the received message to decode
+ * msg : the received message to decode
  *
  * */
-int extract_message_code(char** message) {
+int extract_msg_code(char** msg) {
 	char* token;
-	token = strtok_r(*message, " ", message);
-	*message = strtok_r(*message, "", message);
+	token = strtok_r(*msg, " ", msg);
+	*msg = strtok_r(*msg, "", msg);
 	return atoi(token);
 }
 
@@ -44,30 +47,24 @@ int extract_message_code(char** message) {
  * max_elements : the maximum number of elements in the payload
  *
  * */
-int decode_message_payload(char** raw_payload, int** decoded_payload, int max_elements) {
-	if (!(*decoded_payload = (int*) malloc(max_elements * sizeof(int)))) {
-		perror("malloc error");
-	}
+int decode_msg_payload(char** raw_payload, int* decoded_payload, int max_elements) {
 	int i;
 	for (i = 0; i < max_elements; i++) {
 		char* token = strtok_r(*raw_payload, " ", raw_payload );
 		if (token == NULL) {
 			return i;
 		}
-		*(*decoded_payload + i) = atoi(token);
+		*(decoded_payload + i) = atoi(token);
 	}
 	return i;
 }
 
-void extract_player_nickname(char** message, char** nickname) {
-	if (!(*nickname = (char*) malloc (20* sizeof(char)))) {
-		perror("malloc");
-	}
-	sprintf(*nickname,"%s", strtok_r(*message, " ", message));
+void extract_player_nickname(char** msg, char* nickname) {
+	sprintf(nickname,"%s", strtok_r(*msg, " ", msg));
 }
 
 int rand_range(int upper_limit) {
-	return (int) (( (double) (upper_limit+1) / RAND_MAX) * rand());
+	return (int) (( (double) upper_limit / RAND_MAX) * rand());
 }
 
 bool array_contains(int* haystack, int needle, int length) {
