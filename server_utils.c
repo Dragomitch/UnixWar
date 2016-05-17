@@ -10,7 +10,7 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  DIMOV Theodor, DRAGOMIR Phlippe
+ *         Author:  DIMOV Theodor, DRAGOMIR Philippe
  *   Organization:  IPL
  *
  * ===================================================================

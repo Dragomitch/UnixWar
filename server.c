@@ -1,3 +1,20 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  server.c
+ *
+ *    Description:	
+ *
+ *        Version:  1.0
+ *        Created:  2016-05-15 12:13:40
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  DIMOV Theodor, DRAGOMIR Philippe
+ *   Organization:  IPL
+ *
+ * =====================================================================================
+ */
 #include "server.h"
 
 int cl_count;
@@ -323,3 +340,14 @@ void end_round(int socket, char** msg) {
 	printf("end of round !\n");
 }
 
+void create_nickname_in_shared_memory(char* nickname){
+	key_t nicknamesKey = ftok("./", NICKNAMES_KEY);
+	semaphore mutex;
+
+	if( (mutex = shmget(nicknamesKey, strlen(nickname)*sizeof(char), IPC_CREAT | 0666)) == -1){
+		perror("Shared memory creation failed!");
+		return EXIT_FAILURE;
+	}
+	char* nickname_memory = (char*) shmat(mutex, NULL, 0);
+	strcpy(nickname_memory, nickname);
+}

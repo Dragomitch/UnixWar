@@ -11,7 +11,7 @@
  *       Compiler:  gcc
  *
  *         Author:  DIMOV Theodor, DRAGOMIR Philippe
- *   Organization:
+ *   Organization:	IPL
  *
  * =====================================================================================
  */

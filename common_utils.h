@@ -8,7 +8,7 @@
  *        Version:  1.0
  *        Created:  2016-05-02 09:20:00
  *       Revision:  none
- *       Compiler:  cc
+ *       Compiler:  gcc
  *
  *         Author: DIMOV Theodor, DRAGOMIR Philippe
  *

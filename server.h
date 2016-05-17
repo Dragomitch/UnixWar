@@ -58,3 +58,4 @@ void start_round(); //starts a new round
 void receive_card(int, char**); //receives a given player's played card
 void end_round(int, char**); //ends a round
 void update_score(int, char**); //updates a given player's score in shm
+void create_nickname_shared_in_memory(char* nickname);//create a sharedMemory with the nickname setted in it

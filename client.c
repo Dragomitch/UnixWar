@@ -8,7 +8,7 @@
  *        Version:  1.0
  *        Created:  05/04/2016 03:54:34 PM
  *       Revision:  1
- *       Compiler:  cc
+ *       Compiler:  gcc
  *
  *         Author:  DIMOV Theodor, DRAGOMIR Philippe
  *   Organization:  IPL-Student
@@ -24,8 +24,10 @@
 #include <errno.h>
 #include <netdb.h>
 #include <sys/types.h>
-#include <netinet/in.h>
+#include <sys/ipc.h> 
+#include <sys/shm.h> 
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <time.h>
 #include <string.h>
 #include "config.h"
@@ -36,6 +38,7 @@
 #define BUFFERSIZE 1000
 
 typedef int bool;
+typedef int semaphore;
 
 void receive_message(int client_socket, char* message){
 	int bytesReceived;
@@ -90,7 +93,7 @@ void connectToServer(int *client_socket,char* serverIP,struct hostent *he,struct
 
 }
 
-int main(int argc, char *argv[]){
+/*int main(int argc, char *argv[]){
 	if (argc != 3) {
 		fprintf(stderr, "Usage : Nom_serveur port\n");
 		return EXIT_FAILURE;
@@ -138,4 +141,28 @@ int main(int argc, char *argv[]){
 	close(client_socket);
 	printf("Client - exit");
 	return EXIT_SUCCESS;
+}*/
+int main(int argc, char* argv[]){
+	//testing purposes main
+	create_nickname_shared_memory("HelloWorld");
+}
+
+
+/*
+We are now going to implement a shared memory part into the program,
+for :
+-> The player names
+-> the scores
+*/
+
+void create_nickname_shared_memory(char* nickname){
+	key_t nicknamesKey = ftok("./", NICKNAMES_KEY);
+	semaphore mutex;
+
+	if( (mutex = shmget(nicknamesKey, strlen(nickname)*sizeof(char), IPC_CREAT | 0666)) == -1){
+		perror("Shared memory creation failed!");
+		return EXIT_FAILURE;
+	}
+	char* nickname_memory = (char*) shmat(mutex, NULL, 0);
+	strcpy(nickname_memory, nickname);
 }
