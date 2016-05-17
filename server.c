@@ -2,7 +2,8 @@
 
 int cl_count;
 int cl_sockets[MAX_PLAYERS];
-char cl_nicknames[MAX_PLAYERS][20];
+char cl_nicknames[MAX_PLAYERS][NAMESIZE];
+Player players[MAX_PLAYERS];
 bool game_in_progress;
 bool time_is_up;
 bool running;
@@ -17,7 +18,7 @@ int main(int argc, char** argv) {
 	fd_set fds;
 
 	for (i = 0; i < MAX_PLAYERS; i++) {
-		cl_sockets[i] = 0;
+		players[i].socket = 0;
 	}
 
 	cl_count = 0;
@@ -39,11 +40,11 @@ int main(int argc, char** argv) {
 		max_fd = server_socket + 1;
 		int i;
 		for (i = 0; i < MAX_PLAYERS; i++) {
-			if (cl_sockets[i] > 0) {
-				FD_SET(cl_sockets[i], &fds);
+			if (players[i].socket > 0) {
+				FD_SET(players[i].socket, &fds);
 			}
-			if (cl_sockets[i] >= max_fd) {
-				max_fd = cl_sockets[i]+1;
+			if (players[i].socket >= max_fd) {
+				max_fd = players[i].socket+1;
 			}
 		}
 		if ((select_res = select(max_fd, &fds, NULL, NULL, &timeout)) < 0) {
@@ -131,7 +132,7 @@ void add_client(int server_socket, struct sockaddr_in *cl_addr) {
 }
 
 void add_player(int socket) {
-	cl_sockets[cl_count++] = socket;
+	players[cl_count++].socket = socket;
 	printf("adding!\n");
 	char countdown[2];
 	sprintf(countdown, "%d", COUNTDOWN);
@@ -143,9 +144,9 @@ void add_player(int socket) {
 }
 
 void remove_player(int index) {
-	shutdown_socket(cl_sockets[index]);
-	memcpy(cl_nicknames[index], "\0", 20);
-	cl_sockets[index] = 0;
+	shutdown_socket(players[index].socket);
+	memcpy(players[index].nickname, "\0", 20);
+	players[index].socket = 0;
 	cl_count--;
 }
 
@@ -159,9 +160,9 @@ void add_nickname(int socket, char** msg) {
 	extract_player_nickname(msg, nickname);
 	int i;
 	for (i = 0; i < cl_count; i++) {
-		if (cl_sockets[i] == socket) {
-			sprintf(cl_nicknames[i], "%s", nickname);
-			printf("added a player nickname : %s\n", cl_nicknames[i]);
+		if (players[i].socket == socket) {
+			sprintf(players[i].nickname, "%s", nickname);
+			printf("added a player nickname : %s\n", players[i].nickname);
 			break;
 		}
 	}
@@ -189,7 +190,7 @@ void deal_cards() {
 			dealt_cards[total_dealt_cards++] = random_card;
 		}
 		//distribuer les cartes choisies au joueur
-		send_msg(DEAL, msg, cl_sockets[player]);
+		send_msg(DEAL, msg, players[player].socket);
 		printf("cards dealt : \n");
 		printf("%s\n", msg);
 	}
@@ -200,7 +201,7 @@ void clear_lobby() {
 	game_in_progress = FALSE;
 	int i;
 	for (i = 0; i < cl_count; i++) {
-		if (cl_sockets[i] > 0) {
+		if (players[i].socket > 0) {
 			remove_player(i);
 		}
 	}
@@ -211,8 +212,8 @@ void broadcast(int msg_code, char* payload) {
 	sprintf(msg, "%d %s", msg_code, payload);
 	int i;
 	for (i = 0; i < MAX_PLAYERS; i++) {
-		if (cl_sockets[i] != 0) {
-			if (send(cl_sockets[i], msg, MESSAGE_SIZE, 0) == -1) {
+		if (players[i].socket != 0) {
+			if (send(players[i].socket, msg, MESSAGE_SIZE, 0) == -1) {
 				perror("Send");
 				exit(EXIT_FAILURE);
 			}
@@ -233,12 +234,12 @@ void receive_msg(int fd) {
 		}
 			int i;
 			for (i = 0; i < cl_count; i++) {
-				if (cl_sockets[i] == fd) {
+				if (players[i].socket == fd) {
 					remove_player(i);
 					int j;
 					for (j = i+1; j <= cl_count; j++) { //on vient de supprimer un joueur, cl_count a été décrémenté --> '<='
-						cl_sockets[j-1] = cl_sockets[j];
-						sprintf(cl_nicknames[j-1], "%s", cl_nicknames[j]);
+						players[j-1].socket = players[j].socket;
+						sprintf(players[j-1].nickname, "%s", players[j].nickname);
 					}
 					break;
 				}
@@ -289,8 +290,8 @@ void receive_card(int socket, char** msg) {
 	str_length += sprintf(cards+str_length, "%d ", *card);
 	int i;
 	for ( i = 0; i < cl_count; i++) {
-		if (cl_sockets[i] == socket) {
-			printf("%s played the %s with id %d\n", cl_nicknames[i], get_card_name(*card), *card);
+		if (players[i].socket == socket) {
+			printf("%s played the %s with id %d\n", players[i].nickname, get_card_name(*card), *card);
 			if (*card > highest_card) {
 				highest_card = *card;
 				highest_card_holder = i;
@@ -299,8 +300,8 @@ void receive_card(int socket, char** msg) {
 	}
 	received_cards_count++;
 	if (received_cards_count == cl_count) {
-		send_msg(GIVE, cards, cl_sockets[highest_card_holder]);
-		printf("player %s wins : %s\n", cl_nicknames[highest_card_holder], cards);
+		send_msg(GIVE, cards, players[highest_card_holder].socket);
+		printf("player %s wins : %s\n", players[highest_card_holder].nickname, cards);
 		received_cards_count = 0;
 		highest_card = -1;
 		highest_card_holder = -1;
@@ -315,3 +316,4 @@ void receive_card(int socket, char** msg) {
 void end_round(int socket, char** msg) {
 	printf("end of round !\n");
 }
+

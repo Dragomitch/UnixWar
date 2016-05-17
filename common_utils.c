@@ -26,27 +26,19 @@ void send_msg(int msg_code, const char* payload, int socket) {
 	}
 }
 
-/* *
- * extracts the message code header from the rest of the message.
- *
- * msg : the received message to decode
- *
- * */
-int extract_msg_code(char** msg) {
-	char* token;
-	token = strtok_r(*msg, " ", msg);
-	*msg = strtok_r(*msg, "", msg);
-	return atoi(token);
+void send_light_msg(int msg_code, int socket) {
+	char msg[MESSAGE_SIZE];
+	sprintf(msg, "%d", msg_code);
+	if (send(socket, msg, MESSAGE_SIZE, 0) == -1) {
+		perror("Send");
+		exit(EXIT_FAILURE);
+	}
 }
 
-/* *
- * decodes the message payload
- *
- * raw_payload : the payload to decode
- * decoded_payload : area to store the decoded payload
- * max_elements : the maximum number of elements in the payload
- *
- * */
+int extract_msg_code(char** msg) {
+	return atoi(strtok_r(*msg, " ", msg));
+}
+
 int decode_msg_payload(char** raw_payload, int* decoded_payload, int max_elements) {
 	int i;
 	for (i = 0; i < max_elements; i++) {
@@ -59,20 +51,3 @@ int decode_msg_payload(char** raw_payload, int* decoded_payload, int max_element
 	return i;
 }
 
-void extract_player_nickname(char** msg, char* nickname) {
-	sprintf(nickname,"%s", strtok_r(*msg, " ", msg));
-}
-
-int rand_range(int upper_limit) {
-	return (int) (( (double) upper_limit / RAND_MAX) * rand());
-}
-
-bool array_contains(int* haystack, int needle, int length) {
-	int* array_ptr = haystack;
-	for (; (array_ptr - haystack) < length; array_ptr++) {
-		if (*array_ptr == needle) {
-			return TRUE;
-		}
-	}
-	return FALSE;
-}

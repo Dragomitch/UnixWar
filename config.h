@@ -20,19 +20,24 @@ typedef int bool;
 #define FALSE 0
 
 //message codes
+//server -> client
 #define WAIT		0 //server -> client
 #define REFUSE		1 //server -> client
-#define NICKNAME	2 //client -> server
-#define DISCONNECT	3 //either way
 #define DEAL		4 //server -> client
-#define ASK		5 //server -> client
-#define PLAY		6 //client -> server
+#define ASK			5 //server -> client
 #define GIVE		7 //server -> client
-#define EMPTY		8 //client -> server
 #define ROUND		9 //server -> client
-#define SCORE		10 //user -> client -> shared memory
 #define SCORES		11 //server -> client
-#define WINNER		12 // ?
+#define WINNER		12 // GAME?
+
+//client -> server
+#define NICKNAME	2 //client -> server
+#define PLAY		6 //client -> server
+#define EMPTY		8 //client -> server
+#define SCORE		10 //client -> server
+
+//common
+#define DISCONNECT	3 //either way
 
 //ports
 #define PORT_DIMOV 	17626

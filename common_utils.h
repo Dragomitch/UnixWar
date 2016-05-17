@@ -23,12 +23,43 @@
 #include <sys/socket.h>
 #include "config.h"
 
-#define MESSAGE_SIZE 82
-void send_msg( int, const char*, int );
-int extract_msg_code( char** );
-int decode_msg_payload( char**, int*, int );
-void extract_player_nickname( char**, char* );
-int rand_range( int );
-bool array_contains( int*, int, int );
+#define MESSAGE_SIZE 82 //the maximum size a message could ever have
+
+/*
+ * sends a full message (message code and body) to the given socket.
+ *
+ * msg_code: the message code
+ * payload: additional payload or body
+ * socket: the receiving socket
+ */
+void send_msg( int msg_code, const char* payload, int socket);
+
+/*
+ * sends a message without a body to the given socket.
+ *
+ * msg_code: the message code
+ * socket: the receiving socket
+ */
+void send_light_msg( int msg_code, int socket);
+
+/* *
+* extracts the message code header from the rest of the message.
+*
+* msg : the received message to decode; the pointer is advanced to right after the message code
+*
+* */
+int extract_msg_code( char** msg );
+
+/* *
+* decodes the message payload
+*
+* raw_payload: the payload to decode; the pointer is advanced to right after the last decoded element
+* decoded_payload: area to store the decoded data. It should be alloca    ted and have enough space to contain all of the information necessary.
+* max_elements: the maximum number of elements in the payload
+*
+* return: the actual number of elements found
+*
+* */
+int decode_msg_payload( char** raw_payload, int* decoded_payload, int max_elements);
 
 #endif
