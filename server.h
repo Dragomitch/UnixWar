@@ -43,7 +43,8 @@ void alarm_handler(int); //handles alarm timeouts
 void interrupt_handler(int); //shuts down the server when a SIGINT occurs
 void shutdown_socket(int); //closes a given socket
 void shutdown_server(); //halts the server
-void broadcast(int, char*); //sends a given message to all players
+void broadcast(int, char*); //sends a given message (code and body) to all players
+void broadcast_light(int); //sends a message code to all players
 void add_client(int, struct sockaddr_in*); //adds a client to the fdset
 void add_player(int); //confirm connection and inform client
 void remove_player(int); //removes a player from the game

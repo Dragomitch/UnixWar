@@ -26,7 +26,15 @@
 #define MESSAGE_SIZE 82 //the maximum size a message could ever have
 
 /*
- * sends a full message (message code and body) to the given socket.
+ * sends a pre-formatted message to a given socket.
+ *
+ * msg: a pre-formatted message
+ * socket: the receiving socket
+ */
+void send_prepared_msg( char* msg, int socket);
+
+/*
+ * formats and sends a full message (message code and body) to the given socket.
  *
  * msg_code: the message code
  * payload: additional payload or body
@@ -35,7 +43,7 @@
 void send_msg( int msg_code, const char* payload, int socket);
 
 /*
- * sends a message without a body to the given socket.
+ * formats and sends a message without a body to the given socket.
  *
  * msg_code: the message code
  * socket: the receiving socket

@@ -58,7 +58,6 @@ int main(int argc, char** argv) {
 			for (i = 0; i < max_fd; i++) {
 				if (FD_ISSET(i, &fds)) {
 					if (i == server_socket) {
-						printf("going in .. \n");
 						add_client(server_socket, &cl_addr);
 					} else {
 						receive_msg(i);
@@ -69,7 +68,7 @@ int main(int argc, char** argv) {
 		if (game_in_progress) {
 			if (end_of_turn) {
 				end_of_turn = FALSE;
-				broadcast(ASK, "");
+				broadcast_light(ASK);
 			}
 		}
 	}
@@ -133,7 +132,6 @@ void add_client(int server_socket, struct sockaddr_in *cl_addr) {
 
 void add_player(int socket) {
 	players[cl_count++].socket = socket;
-	printf("adding!\n");
 	char countdown[2];
 	sprintf(countdown, "%d", COUNTDOWN);
 	send_msg(WAIT, countdown, socket);
@@ -151,7 +149,7 @@ void remove_player(int index) {
 }
 
 void refuse_connection(int socket) {
-	send_msg(REFUSE, "", socket);
+	send_light_msg(REFUSE, socket);
 }
 
 void add_nickname(int socket, char** msg) {
@@ -197,7 +195,7 @@ void deal_cards() {
 }
 
 void clear_lobby() {
-	broadcast(DISCONNECT, "");
+	broadcast_light(DISCONNECT);
 	game_in_progress = FALSE;
 	int i;
 	for (i = 0; i < cl_count; i++) {
@@ -213,10 +211,18 @@ void broadcast(int msg_code, char* payload) {
 	int i;
 	for (i = 0; i < MAX_PLAYERS; i++) {
 		if (players[i].socket != 0) {
-			if (send(players[i].socket, msg, MESSAGE_SIZE, 0) == -1) {
-				perror("Send");
-				exit(EXIT_FAILURE);
-			}
+			send_prepared_msg(msg, players[i].socket);
+		}
+	}
+}
+
+void broadcast_light(int msg_code) {
+	char msg[MESSAGE_SIZE];
+	sprintf(msg, "%d", msg_code);
+	int i;
+	for (i = 0; i < MAX_PLAYERS; i++) {
+		if (players[i].socket != 0) {
+			send_prepared_msg(msg, players[i].socket);
 		}
 	}
 }
@@ -252,7 +258,7 @@ void receive_msg(int fd) {
 }
 
 void start_game() {
-	broadcast(ROUND, "");
+	broadcast_light(ROUND);
 	deal_cards();
 	start_round();
 	game_in_progress = TRUE;
@@ -260,7 +266,7 @@ void start_game() {
 
 void start_round() {
 	end_of_turn = FALSE;
-	broadcast(ASK, "");
+	broadcast_light(ASK);
 }
 
 void shutdown_socket(int socket) {

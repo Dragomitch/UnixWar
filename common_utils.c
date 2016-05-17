@@ -16,23 +16,25 @@
  */
 #include "common_utils.h"
 
-void send_msg(int msg_code, const char* payload, int socket) {
-	char msg[MESSAGE_SIZE];
-	sprintf(msg, "%d %s", msg_code, payload);
-	printf("sending msg : %s\n", msg);
-	if (send(socket, msg, MESSAGE_SIZE, 0) == -1) {
+
+void send_prepared_msg(char* pmsg, int socket) {
+	if (send(socket, pmsg, MESSAGE_SIZE, 0) == -1) {
 		perror("Send");
 		exit(EXIT_FAILURE);
 	}
 }
 
+void send_msg(int msg_code, const char* payload, int socket) {
+	char msg[MESSAGE_SIZE];
+	sprintf(msg, "%d %s", msg_code, payload);
+	printf("sending msg : %s\n", msg);
+	send_prepared_msg(msg, socket);
+}
+
 void send_light_msg(int msg_code, int socket) {
 	char msg[MESSAGE_SIZE];
 	sprintf(msg, "%d", msg_code);
-	if (send(socket, msg, MESSAGE_SIZE, 0) == -1) {
-		perror("Send");
-		exit(EXIT_FAILURE);
-	}
+	send_prepared_msg(msg, socket);
 }
 
 int extract_msg_code(char** msg) {
