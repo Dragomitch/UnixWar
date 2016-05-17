@@ -93,7 +93,7 @@ void connectToServer(int *client_socket,char* serverIP,struct hostent *he,struct
 
 }
 
-/*int main(int argc, char *argv[]){
+int main(int argc, char *argv[]){
 	if (argc != 3) {
 		fprintf(stderr, "Usage : Nom_serveur port\n");
 		return EXIT_FAILURE;
@@ -141,28 +141,4 @@ void connectToServer(int *client_socket,char* serverIP,struct hostent *he,struct
 	close(client_socket);
 	printf("Client - exit");
 	return EXIT_SUCCESS;
-}*/
-int main(int argc, char* argv[]){
-	//testing purposes main
-	create_nickname_shared_memory("HelloWorld");
-}
-
-
-/*
-We are now going to implement a shared memory part into the program,
-for :
--> The player names
--> the scores
-*/
-
-void create_nickname_shared_memory(char* nickname){
-	key_t nicknamesKey = ftok("./", NICKNAMES_KEY);
-	semaphore mutex;
-
-	if( (mutex = shmget(nicknamesKey, strlen(nickname)*sizeof(char), IPC_CREAT | 0666)) == -1){
-		perror("Shared memory creation failed!");
-		return EXIT_FAILURE;
-	}
-	char* nickname_memory = (char*) shmat(mutex, NULL, 0);
-	strcpy(nickname_memory, nickname);
 }

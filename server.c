@@ -340,14 +340,27 @@ void end_round(int socket, char** msg) {
 	printf("end of round !\n");
 }
 
-void create_nickname_in_shared_memory(char* nickname){
+int create_nicknames_space_in_shared_memory(){
 	key_t nicknamesKey = ftok("./", NICKNAMES_KEY);
-	semaphore mutex;
+	int memoryId;
 
-	if( (mutex = shmget(nicknamesKey, strlen(nickname)*sizeof(char), IPC_CREAT | 0666)) == -1){
-		perror("Shared memory creation failed!");
+	if( (memoryId = shmget(nicknamesKey, MAX_PLAYERS*sizeof(char*), IPC_CREAT | 0666)) == -1){
+		perror("Shared memory creation for an table of nicknames failed!\n");
 		return EXIT_FAILURE;
 	}
-	char* nickname_memory = (char*) shmat(mutex, NULL, 0);
-	strcpy(nickname_memory, nickname);
+	return memoryId;
+}
+
+int put_nickname_in_shared_memory(char* nickname, int nicknamesTableShmId, int playerId){
+	key_t nicknameKey = ftok("./", "player"+playerId);
+	//maloc?
+	char** nicknames_memory = (char**) shmat(nicknamesTableShmId, NULL, 0);
+	strcpy(nicknamse_memory[playerId], nickname);
+}
+
+void delete_nickname_in_shared_memory(int memoryId){
+	/*may be complicated, use some exec with the part of the script for
+	* that part of ipcsKilling script
+	*... shmctl?
+	*/ 
 }

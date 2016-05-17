@@ -23,3 +23,4 @@ void create_nickname(char *name);
 void send_message(int client_socket);
 void receive_message(int client_socket, char* message);
 void create_nickname_shared_memory(char* nickname);
+char** get_players_names();
