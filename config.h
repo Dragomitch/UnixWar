@@ -45,3 +45,4 @@ typedef int bool;
 
 #define MAX_PLAYERS 4
 #define NAMESIZE 20
+#define MESSAGE_SIZE 82

@@ -23,8 +23,6 @@
 #include <sys/socket.h>
 #include "config.h"
 
-#define MESSAGE_SIZE 82 //the maximum size a message could ever have
-
 /*
  * sends a pre-formatted message to a given socket.
  *

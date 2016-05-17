@@ -1,5 +1,12 @@
-int hand[DECK_SIZE / 2];
-int stash[DECK_SIZE / 2];
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include "config.h"
+#include "cards.h"
+#include "common_utils.h"
+
+int hand[DECK_SIZE];
+int stash[DECK_SIZE];
 int cards_in_hand;
 int cards_in_stash;
 
@@ -15,18 +22,14 @@ void receive_msg(int i, int socket, char** nickname) {
 	int msg_code = extract_msg_code(&msg_ptr); //renvoie le code et déplace le pointeur
 	if (msg_code == WAIT) {
 		printf("received a connection confirmation WAIT\n");
-		printf("my nickname : %s\n", *name);
-		send_msg(NICKNAME, *name, clientSocket);
+		printf("my nickname : %s\n", *nickname);
+		send_msg(NICKNAME, *nickname, socket);
 	} else if (msg_code == REFUSE || msg_code == DISCONNECT) {
 		printf("received a connection refusal REFUSE\n");
-		close(clientSocket);
+		close(socket);
 	} else if (msg_code == ROUND) {
 		printf("new round\n");
 	} else if (msg_code == DEAL) {
-		int dealt_cards_array[DECK_SIZE / 2];
-		int* dealt_cards = dealt_cards_array;
-		int size = decode_msg_payload(&msg, dealt_cards, DECK_SIZE / 2); //remplit la liste de cartes et renvoie le nombre de cartes reçues
-		memcpy(hand, dealt_cards, size * sizeof(int));
-		cards_in_hand = size;
+		cards_in_hand = decode_msg_payload(&msg_ptr, hand, DECK_SIZE); //remplit la liste de cartes et renvoie le nombre de cartes reçues
 	} // ...
 }
