@@ -101,7 +101,6 @@ void receive_message(int clientSocket,char** name){
 	}else if(msg_code == DEAL){
 		cards_in_hand = decode_msg_payload(&msg, hand, DECK_SIZE / 2);
 		printf("There are your cards : \n");
-		print_cards();
 	}else if(msg_code == ASK){
 		print_cards();
 		int choice = -1;
