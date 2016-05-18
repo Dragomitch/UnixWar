@@ -20,6 +20,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <sys/wait.h>
 #include "common_utils.h"
 #include "server_utils.h"
@@ -33,21 +35,14 @@
 
 typedef void (*fct_ptr)( );
 
-typedef struct player {
-	int socket;
-	char nickname[NAMESIZE];
-} Player;
-
 void init_server(int*, struct sockaddr_in*); //creates and binds socket
 void alarm_handler(int); //handles alarm timeouts
 void interrupt_handler(int); //shuts down the server when a SIGINT occurs
 void shutdown_socket(int); //closes a given socket
 void shutdown_server(); //halts the server
-void broadcast(int, char*); //sends a given message (code and body) to all players
-void broadcast_light(int); //sends a message code to all players
 void add_client(int, struct sockaddr_in*); //adds a client to the fdset
 void add_player(int); //confirm connection and inform client
-void remove_player(int); //removes a player from the game
+void remove_player(int, bool); //removes a player from the game
 void refuse_connection(int); //refuses a given client's connection request
 void receive_msg(int); //handles incoming messages
 void clear_lobby(); //informs awaiting players that the game is over

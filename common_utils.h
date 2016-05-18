@@ -8,7 +8,7 @@
  *        Version:  1.0
  *        Created:  2016-05-02 09:20:00
  *       Revision:  none
- *       Compiler:  gcc
+ *       Compiler:  cc
  *
  *         Author: DIMOV Theodor, DRAGOMIR Philippe
  *
@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include "config.h"
+
+#define MESSAGE_SIZE 82 //the maximum size a message could ever have
 
 /*
  * sends a pre-formatted message to a given socket.
@@ -47,6 +49,9 @@ void send_msg( int msg_code, const char* payload, int socket);
  * socket: the receiving socket
  */
 void send_light_msg( int msg_code, int socket);
+
+// int* ?
+void send_int_msg( int msg_code, int payload, int socket);
 
 /* *
 * extracts the message code header from the rest of the message.

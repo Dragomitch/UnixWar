@@ -10,12 +10,34 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  DIMOV Theodor, DRAGOMIR Philippe
+ *         Author:  DIMOV Theodor, DRAGOMIR Phlippe
  *   Organization:  IPL
  *
  * ===================================================================
  */
 #include "server_utils.h"
+
+void broadcast(int msg_code, char* payload, player* recipients, int rcp_count) {
+	char msg[MESSAGE_SIZE];
+	sprintf(msg, "%d %s", msg_code, payload);
+	int i;
+	for (i = 0; i < rcp_count; i++) {
+		if (recipients[i].socket != 0) {
+			send_prepared_msg(msg, recipients[i].socket);
+		}
+	}
+}
+
+void broadcast_light(int msg_code, player* recipients, int rcp_count) {
+	char msg[MESSAGE_SIZE];
+	sprintf(msg, "%d", msg_code);
+	int i;
+	for (i = 0; i < rcp_count; i++) {
+		if (recipients[i].socket != 0) {
+			send_prepared_msg(msg, recipients[i].socket);
+		}
+	}
+}
 
 void extract_player_nickname(char** msg, char* nickname) {
 	sprintf(nickname,"%s", strtok_r(*msg, " ", msg));

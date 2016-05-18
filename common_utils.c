@@ -8,7 +8,7 @@
  *        Version:  1.0
  *        Created:  2016-05-02 09:20:00
  *       Revision:  none
- *       Compiler:  gcc
+ *       Compiler:  cc
  *
  *         Author: DIMOV Theodor, DRAGOMIR Philippe
  *
@@ -27,13 +27,18 @@ void send_prepared_msg(char* pmsg, int socket) {
 void send_msg(int msg_code, const char* payload, int socket) {
 	char msg[MESSAGE_SIZE];
 	sprintf(msg, "%d %s", msg_code, payload);
-	printf("sending msg : %s\n", msg);
 	send_prepared_msg(msg, socket);
 }
 
 void send_light_msg(int msg_code, int socket) {
 	char msg[MESSAGE_SIZE];
 	sprintf(msg, "%d", msg_code);
+	send_prepared_msg(msg, socket);
+}
+
+void send_int_msg(int msg_code, int payload, int socket) {
+	char msg[MESSAGE_SIZE];
+	sprintf(msg, "%d %d", msg_code, payload);
 	send_prepared_msg(msg, socket);
 }
 

@@ -1,38 +1,31 @@
-/*
- * =====================================================================================
- *
- *       Filename:  server.c
- *
- *    Description:	
- *
- *        Version:  1.0
- *        Created:  2016-05-15 12:13:40
- *       Revision:  none
- *       Compiler:  gcc
- *
- *         Author:  DIMOV Theodor, DRAGOMIR Philippe
- *   Organization:  IPL
- *
- * =====================================================================================
- */
 #include "server.h"
 
 int cl_count;
 int cl_sockets[MAX_PLAYERS];
 char cl_nicknames[MAX_PLAYERS][NAMESIZE];
-Player players[MAX_PLAYERS];
+int pl_scores[MAX_PLAYERS];
+player players[MAX_PLAYERS];
 bool game_in_progress;
 bool time_is_up;
-bool running;
-bool end_of_turn;
+bool running; //server is running
+bool end_of_turn; //the current turn is over
+bool sigempty; //a player has signaled that he's out of cards
+bool end_of_round; //the current round is over
+int round_nb;
 
-fct_ptr dispatcher[] = { add_player, refuse_connection, add_nickname, 0, 0, 0, receive_card, 0, end_round };
+fct_ptr dispatcher[] = { add_player, refuse_connection, add_nickname, 0, 0, 0, receive_card, 0, end_round, 0, update_score };
 
 int main(int argc, char** argv) {
-	int server_socket, max_fd, select_res, i;
+	int server_socket, max_fd, select_res, i, max_rounds;
 	struct sockaddr_in my_addr, cl_addr;
 	struct timeval timeout = {0, 15000}; //15 milliseconds
 	fd_set fds;
+
+	if (argc != 2) {
+		fprintf(stderr, "Gimme args! [maximum number of rounds]\n");
+		return EXIT_FAILURE;
+	}
+	max_rounds = atoi(argv[1]);
 
 	for (i = 0; i < MAX_PLAYERS; i++) {
 		players[i].socket = 0;
@@ -44,6 +37,8 @@ int main(int argc, char** argv) {
 	running = TRUE;
 
 	struct sigaction alarm, interrupt;
+	memset(&alarm, 0, sizeof(alarm));
+	memset(&interrupt, 0, sizeof(interrupt));
 	alarm.sa_handler = &alarm_handler;
 	interrupt.sa_handler = &interrupt_handler;
 	sigaction(SIGALRM, &alarm, NULL);
@@ -83,14 +78,36 @@ int main(int argc, char** argv) {
 			}
 		}
 		if (game_in_progress) {
-			if (end_of_turn) {
+			if (end_of_turn && !sigempty) {
 				end_of_turn = FALSE;
-				broadcast_light(ASK);
+				broadcast_light(ASK, players, cl_count);
+			}
+			if (end_of_round) {
+				round_nb++;
+				printf("new round !!!\n");
+				if (round_nb == max_rounds) {
+					//end_game();
+					clear_lobby();
+					round_nb = 0;
+					printf("game over\n");
+				} else {
+					start_round();
+				}
 			}
 		}
 	}
 	shutdown_socket(server_socket);
 	return EXIT_SUCCESS;
+}
+
+int find_index(player* players, int socket) {
+	int i;
+	for (i = 0; i < MAX_PLAYERS; i++) {
+		if (players[i].socket == socket) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 void alarm_handler(int signum) {
@@ -101,6 +118,7 @@ void alarm_handler(int signum) {
 			start_game();
 		}
 		time_is_up = TRUE;
+		alarm(0);
 	}
 }
 
@@ -149,19 +167,20 @@ void add_client(int server_socket, struct sockaddr_in *cl_addr) {
 
 void add_player(int socket) {
 	players[cl_count++].socket = socket;
-	char countdown[2];
-	sprintf(countdown, "%d", COUNTDOWN);
-	send_msg(WAIT, countdown, socket);
+	send_int_msg(WAIT, COUNTDOWN, socket);
 	if (cl_count == 1) {
 		//first client, set an alarm for 30 seconds
 		alarm(COUNTDOWN);
 	}
 }
 
-void remove_player(int index) {
-	shutdown_socket(players[index].socket);
+void remove_player(int index, bool sockopen) {
+	if (sockopen) {
+		shutdown_socket(players[index].socket);
+	}
 	memcpy(players[index].nickname, "\0", 20);
 	players[index].socket = 0;
+	pl_scores[index] = 0;
 	cl_count--;
 }
 
@@ -173,14 +192,9 @@ void add_nickname(int socket, char** msg) {
 	printf("nickname : %s\n", *msg);
 	char nickname[NAMESIZE];
 	extract_player_nickname(msg, nickname);
-	int i;
-	for (i = 0; i < cl_count; i++) {
-		if (players[i].socket == socket) {
-			sprintf(players[i].nickname, "%s", nickname);
-			printf("added a player nickname : %s\n", players[i].nickname);
-			break;
-		}
-	}
+	int index = find_index(players, socket);
+	sprintf(players[index].nickname, "%s", nickname);
+	printf("added a player nickname : %s\n", players[index].nickname);
 }
 
 void deal_cards() {
@@ -212,34 +226,12 @@ void deal_cards() {
 }
 
 void clear_lobby() {
-	broadcast_light(DISCONNECT);
+	broadcast_light(DISCONNECT, players, cl_count);
 	game_in_progress = FALSE;
 	int i;
 	for (i = 0; i < cl_count; i++) {
 		if (players[i].socket > 0) {
-			remove_player(i);
-		}
-	}
-}
-
-void broadcast(int msg_code, char* payload) {
-	char msg[MESSAGE_SIZE];
-	sprintf(msg, "%d %s", msg_code, payload);
-	int i;
-	for (i = 0; i < MAX_PLAYERS; i++) {
-		if (players[i].socket != 0) {
-			send_prepared_msg(msg, players[i].socket);
-		}
-	}
-}
-
-void broadcast_light(int msg_code) {
-	char msg[MESSAGE_SIZE];
-	sprintf(msg, "%d", msg_code);
-	int i;
-	for (i = 0; i < MAX_PLAYERS; i++) {
-		if (players[i].socket != 0) {
-			send_prepared_msg(msg, players[i].socket);
+			remove_player(i, TRUE);
 		}
 	}
 }
@@ -255,35 +247,29 @@ void receive_msg(int fd) {
 		else {
 			perror("Could not read message");
 		}
-			int i;
-			for (i = 0; i < cl_count; i++) {
-				if (players[i].socket == fd) {
-					remove_player(i);
-					int j;
-					for (j = i+1; j <= cl_count; j++) { //on vient de supprimer un joueur, cl_count a été décrémenté --> '<='
-						players[j-1].socket = players[j].socket;
-						sprintf(players[j-1].nickname, "%s", players[j].nickname);
-					}
-					break;
-				}
-			}
+		int index = find_index(players, fd);
+		remove_player(index, FALSE);
+		int j;
+		for (j = index+1; j <= cl_count; j++) { //on vient de supprimer un joueur, cl_count a été décrémenté --> '<='
+			players[j-1].socket = players[j].socket;
+			sprintf(players[j-1].nickname, "%s", players[j].nickname);
+		}
 	} else {
-		printf("message : %s\n", msg_ptr);
 		int msg_code = extract_msg_code(&msg_ptr);
 		dispatcher[msg_code] (fd, &msg_ptr);
 	}
 }
 
 void start_game() {
-	broadcast_light(ROUND);
-	deal_cards();
 	start_round();
 	game_in_progress = TRUE;
 }
 
 void start_round() {
-	end_of_turn = FALSE;
-	broadcast_light(ASK);
+	deal_cards();
+	end_of_turn = TRUE; //voir fin du main
+	end_of_round = FALSE;
+	sigempty = FALSE;
 }
 
 void shutdown_socket(int socket) {
@@ -306,61 +292,72 @@ void receive_card(int socket, char** msg) {
 	static int highest_card = -1;
 	static int highest_card_holder = -1;
 	static int str_length = 0;
-	static char cards[MAX_PLAYERS * 3];
-	int card_container[1];
-	int* card = card_container;
-	decode_msg_payload(msg, card, 1);
-	str_length += sprintf(cards+str_length, "%d ", *card);
-	int i;
-	for ( i = 0; i < cl_count; i++) {
-		if (players[i].socket == socket) {
-			printf("%s played the %s with id %d\n", players[i].nickname, get_card_name(*card), *card);
-			if (*card > highest_card) {
-				highest_card = *card;
-				highest_card_holder = i;
+	static char cards[MAX_PLAYERS * 3];//:
+	int player_index = find_index(players, socket);
+	if (players[player_index].has_played || end_of_turn) { //player has already played a card or has missed his turn
+		if (!players[player_index].has_played) {
+			received_cards_count++;
+		}
+	} else { //en ordre, on accepte la carte
+		int card;
+		decode_msg_payload(msg, &card, 1);
+		players[player_index].has_played = TRUE;
+		str_length += sprintf(cards+str_length, "%d ", card);
+		if (card > highest_card) {
+			highest_card = card;
+			highest_card_holder = socket;
+		}
+		received_cards_count++;
+		if (received_cards_count == cl_count) {
+			send_msg(GIVE, cards, highest_card_holder);
+			memset(cards, 0, cl_count * sizeof(int));
+			int i;
+			for (i = 0; i < cl_count; i++) {
+				players[i].has_played = FALSE;
+			}
+			received_cards_count = 0;
+			highest_card = -1;
+			str_length = 0;
+			end_of_turn = TRUE;
+			if (sigempty) {
+				broadcast_light(ROUND, players, cl_count);
 			}
 		}
 	}
-	received_cards_count++;
-	if (received_cards_count == cl_count) {
-		send_msg(GIVE, cards, players[highest_card_holder].socket);
-		printf("player %s wins : %s\n", players[highest_card_holder].nickname, cards);
-		received_cards_count = 0;
-		highest_card = -1;
-		highest_card_holder = -1;
-		memset(cards, 0, cl_count * sizeof(int));
-		str_length = 0;
-		end_of_turn = TRUE;
-	}
-	char buffer[10];
-	fgets(buffer, 10, stdin);
 }
 
 void end_round(int socket, char** msg) {
-	printf("end of round !\n");
-}
-
-int create_nicknames_space_in_shared_memory(){
-	key_t nicknamesKey = ftok("./", NICKNAMES_KEY);
-	int memoryId;
-
-	if( (memoryId = shmget(nicknamesKey, MAX_PLAYERS*sizeof(char*), IPC_CREAT | 0666)) == -1){
-		perror("Shared memory creation for an table of nicknames failed!\n");
-		return EXIT_FAILURE;
+	if (!sigempty) {
+		printf("end of round !\n");
+		sigempty = TRUE;
 	}
-	return memoryId;
 }
 
-int put_nickname_in_shared_memory(char* nickname, int nicknamesTableShmId, int playerId){
-	key_t nicknameKey = ftok("./", "player"+playerId);
-	//maloc?
-	char** nicknames_memory = (char**) shmat(nicknamesTableShmId, NULL, 0);
-	strcpy(nicknamse_memory[playerId], nickname);
+void update_score(int socket, char** msg) {
+	static int count = 0;
+	int score;
+	decode_msg_payload(msg, &score, 1);
+	int i;
+	for (i = 0; i < cl_count; i++) {
+		if (players[i].socket == socket) {
+			pl_scores[i] += score;
+		}
+	}
+	count++;
+	if (count == cl_count) {
+		printf("all scores updated.\n");
+		count = 0;
+		end_of_round = TRUE;
+		printf("player scores : \n");
+		int i;
+		for (i = 0; i < cl_count; i++) {
+			if (players[i].socket > 0) {
+				printf("%s : %d points\n", players[i].nickname, pl_scores[i]);
+			}
+		}
+		char buffer[10];
+		printf("press any key to play next round\n");
+		fgets(buffer, 10, stdin);
+	}
 }
 
-void delete_nickname_in_shared_memory(int memoryId){
-	/*may be complicated, use some exec with the part of the script for
-	* that part of ipcsKilling script
-	*... shmctl?
-	*/ 
-}
