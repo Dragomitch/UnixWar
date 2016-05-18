@@ -24,7 +24,8 @@
 typedef struct player {
 	int socket;
 	char nickname[NAMESIZE];
-	bool has_played;
+	int played_card;
+	bool isempty;
 } player;
 
 void broadcast( int msg_code, char* payload, player* recipients, int rcp_count ); //sends a message (code and body) to all players
