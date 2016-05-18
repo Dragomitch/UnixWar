@@ -316,15 +316,18 @@ void receive_card(int socket, char** msg) {
 	int player_index = find_index(players, socket);
 	int card;
 	decode_msg_payload(msg, &card, 1);
+	printf("card received : %d\n", card);
 	players[player_index].played_card = card;
 	received_cards_count++;
 	str_length += sprintf(cards+str_length, "%d ", card);
 	if (received_cards_count == cl_count) {
-		int highest_card_holder, highest_card = 0, i, empty_count, empty_index;
+		int highest_card_holder, highest_card = 0, i, empty_count = 0, empty_index;
 		for (i = 0; i < cl_count; i++) {
 			if (players[i].played_card >= highest_card) {
+				highest_card = players[i].played_card;
 				highest_card_holder = i;
 			}
+			printf("highest card : %d\n", players[highest_card_holder].played_card);
 			if (players[i].isempty) {
 				empty_count++;
 				empty_index = i;
@@ -368,10 +371,8 @@ void update_score(int socket, char** msg) {
 	}
 	count++;
 	if (count == cl_count) {
-		printf("all scores updated.\n");
 		count = 0;
 		end_of_round = TRUE;
-		printf("player scores : \n");
 		int i;
 		for (i = 0; i < cl_count; i++) {
 			if (players[i].socket > 0) {
