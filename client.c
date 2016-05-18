@@ -34,14 +34,20 @@ int cards_in_stash;
 
 void print_cards() {
 	int i;
-	printf("current hand : ");
+	printf("current hand : ");	
 	for (i = 0; i < cards_in_hand; i++) {
-		printf("%d ", hand[i]);
+		printf("%d: %s ", i, get_card_name(hand[i]));
+		if(i+1 < cards_in_hand){
+			printf("; ");
+		}
 	}
 	printf("\n");
 	printf("current stash : ");
 	for (i = 0; i < cards_in_stash; i++) {
-		printf("%d ", stash[i]);
+		printf("%d: %s ", i, get_card_name(stash[i]));
+		if(i+1 < cards_in_stash ){
+			printf("; ");
+		}
 	}
 	printf("\n");
 }
@@ -94,11 +100,13 @@ void receive_message(int clientSocket,char** name){
 		printf("score sent : %d .. \n", score);
 	}else if(msg_code == DEAL){
 		cards_in_hand = decode_msg_payload(&msg, hand, DECK_SIZE / 2);
+		printf("There are your cards : \n");
 		print_cards();
 	}else if(msg_code == ASK){
-		printf("BEFORE\n");
 		print_cards();
+		int choice = -1;
 		if (cards_in_hand + cards_in_stash == 1) {
+			printf("You are playing your last card\n");
 			//the player is about to play his last card, the round is over
 			send_light_msg(EMPTY, clientSocket);
 		}
@@ -108,24 +116,34 @@ void receive_message(int clientSocket,char** name){
 			memset(stash, -1, cards_in_stash * sizeof(int));
 			cards_in_hand = cards_in_stash;
 			cards_in_stash = 0;
-			printf("replenished\n");
+			printf("hand replenished from stash\n");
 			print_cards();
 		}
-		send_int_msg(PLAY, hand[0], clientSocket);
+		int times = 0;
+		do{
+			if(times > 0){
+				printf("You are pleased to choose one of YOUR cards\n");
+				print_cards();
+			}
+			printf("What card number do you want to play ?\n");
+			scanf("%d", &choice);
+		}while(choice < 0 || choice > cards_in_hand);
+		send_int_msg(PLAY, hand[choice], clientSocket);
 		int i;
-		for (i = 0; i < cards_in_hand-1; i++) {
+		for (i = choice; i < cards_in_hand-1; i++) {
 			hand[i] = hand[i+1];
 		}
 		cards_in_hand--;
-		printf("AFTER\n");
+		printf("Your new hand is: ");
 		print_cards();
+		printf("\n");
 	}else if(msg_code == GIVE){
 		int* stash_ptr = stash + cards_in_stash;
 		int size = decode_msg_payload(&msg, stash_ptr, MAX_PLAYERS);
 		cards_in_stash += size;
 		printf("WON CARDS!\n");
 		print_cards();
-		printf("\\WON CARDS!\n");
+		printf("Continue like that to be the winner of the game!\n");
 	}else{
 		printf("Message not support yet !");
 	}
