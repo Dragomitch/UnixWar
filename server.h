@@ -15,7 +15,8 @@
  *
  * =====================================================================================
  */
-
+#ifndef SERVERH_H
+#define SERVERH_H
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
@@ -32,7 +33,7 @@
 #define BUFFER_SIZE 1024
 #define BACKLOG 5
 #define COUNTDOWN 10 //30 seconds wait time
-
+#endif
 typedef void (*fct_ptr)( );
 
 void init_server(int*, struct sockaddr_in*); //creates and binds socket
