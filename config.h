@@ -47,5 +47,5 @@ typedef int bool;
 #define NAMESIZE 20
 #define MESSAGE_SIZE 82
 
-//shared-memory
+//shared-memory keys
 #define NICKNAMES_KEY "nicknames"

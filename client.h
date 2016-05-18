@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -30,7 +31,6 @@
 #include "config.h"
 #include "common_utils.h"
 #include "cards.h"
-#include "game.h"
 
 #define PORT PORT_DIMOV
 #endif
@@ -40,3 +40,4 @@ int calculate_score();
 void receive_message(int clientSocket,char** name);
 void createNickname(char *name);
 void connectToServer(int *clientSocket,char* serverIP,struct hostent *he,struct sockaddr_in *serverAddress);
+bool fdp_is_valid(int fdp);

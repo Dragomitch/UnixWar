@@ -71,18 +71,19 @@ void receive_message(int clientSocket,char** name){
 		exit(EXIT_FAILURE);
 	}
 	msgFromServer[bytesReceived]='\0';
-	printf("%s\n",msgFromServer);
 	fflush(stdout);
 	int msg_code = extract_msg_code(&msg);
-	printf("msg code received : %d\n", msg_code);
-	if (msg_code == WAIT) {
-		printf("received a connection confirmation WAIT\n");
-		printf("my nickname : %s\n", *name);
+	if(msg_code == WAIT){
 		send_msg(NICKNAME, *name, clientSocket);
-	} else if (msg_code == REFUSE || msg_code == DISCONNECT) {
-		printf("received a connection refusal REFUSE\n");
+	}else if(msg_code == REFUSE){
+		printf("received a connection refusal from the server.\n");
+		printf("End of game!\n\n");
 		close(clientSocket);
-	} else if (msg_code == ROUND) {
+	}else if(msg_code == DISCONNECT){
+		printf("received a disconnection from server.\n");
+		printf("End of game!\n\n");
+		close(clientSocket);
+	}else if(msg_code == ROUND){
 		printf("end of round!\n");
 		int score = calculate_score();
 		send_int_msg(SCORE, score, clientSocket);
@@ -91,10 +92,10 @@ void receive_message(int clientSocket,char** name){
 		cards_in_hand = 0;
 		cards_in_stash = 0;
 		printf("score sent : %d .. \n", score);
-	} else if (msg_code == DEAL) {
+	}else if(msg_code == DEAL){
 		cards_in_hand = decode_msg_payload(&msg, hand, DECK_SIZE / 2);
 		print_cards();
-	} else if (msg_code == ASK) {
+	}else if(msg_code == ASK){
 		printf("BEFORE\n");
 		print_cards();
 		if (cards_in_hand + cards_in_stash == 1) {
@@ -118,13 +119,15 @@ void receive_message(int clientSocket,char** name){
 		cards_in_hand--;
 		printf("AFTER\n");
 		print_cards();
-	} else if (msg_code == GIVE) {
+	}else if(msg_code == GIVE){
 		int* stash_ptr = stash + cards_in_stash;
 		int size = decode_msg_payload(&msg, stash_ptr, MAX_PLAYERS);
 		cards_in_stash += size;
 		printf("WON CARDS!\n");
 		print_cards();
 		printf("\\WON CARDS!\n");
+	}else{
+		printf("Message not support yet !");
 	}
 }
 
@@ -158,6 +161,10 @@ void connectToServer(int *client_socket,char* server_ip,struct hostent *host,str
 	}
 }
 
+bool fdp_is_valid(int fdp){
+	return fcntl(fdp, F_GETFD) != -1 || errno != EBADF;
+}
+
 int main(int argc, char *argv[]){
 	if (argc != 2) {
 		fprintf(stderr, "Usage : ./client Adresse_du_serveur\n");
@@ -176,9 +183,13 @@ int main(int argc, char *argv[]){
 	connectToServer(&client_socket,argv[1],host,&server_address);
 	
 	while (1){
+		if(!fdp_is_valid(client_socket)){
+			printf("Le serveur a fermé la connection, Clearing all IPC\n");
+			break;
+		}
 		receive_message(client_socket, &name_ptr);
 	}
 	close(client_socket);
-	printf("Client - exit");
+	printf("Client : exit\n\n");
 	return EXIT_SUCCESS;
 }
