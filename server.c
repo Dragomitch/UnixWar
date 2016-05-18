@@ -316,7 +316,6 @@ void receive_card(int socket, char** msg) {
 	int player_index = find_index(players, socket);
 	int card;
 	decode_msg_payload(msg, &card, 1);
-	printf("card received : %d\n", card);
 	players[player_index].played_card = card;
 	received_cards_count++;
 	str_length += sprintf(cards+str_length, "%d ", card);
@@ -327,7 +326,6 @@ void receive_card(int socket, char** msg) {
 				highest_card = players[i].played_card;
 				highest_card_holder = i;
 			}
-			printf("highest card : %d\n", players[highest_card_holder].played_card);
 			if (players[i].isempty) {
 				empty_count++;
 				empty_index = i;
