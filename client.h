@@ -15,6 +15,8 @@
  *
  * =====================================================================================
  */
+#ifndef CLIENTH_H
+#define CLIENTH_H
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -28,12 +30,13 @@
 #include "config.h"
 #include "common_utils.h"
 #include "cards.h"
+#include "game.h"
 
 #define PORT PORT_DIMOV
+#endif
 
 void print_cards();
 int calculate_score();
-void sendReceive(int i,int clientSocket,char** name);
+void receive_message(int clientSocket,char** name);
 void createNickname(char *name);
 void connectToServer(int *clientSocket,char* serverIP,struct hostent *he,struct sockaddr_in *serverAddress);
-

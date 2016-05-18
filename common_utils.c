@@ -19,7 +19,7 @@
 
 void send_prepared_msg(char* pmsg, int socket) {
 	if (send(socket, pmsg, MESSAGE_SIZE, 0) == -1) {
-		perror("Send");
+		perror("Failed to send a mesesage to the serveur");
 		exit(EXIT_FAILURE);
 	}
 }
