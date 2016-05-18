@@ -85,10 +85,12 @@ void receive_message(int clientSocket,char** name){
 		printf("received a connection refusal from the server.\n");
 		printf("End of game!\n\n");
 		close(clientSocket);
+		exit(-1);
 	}else if(msg_code == DISCONNECT){
 		printf("received a disconnection from server.\n");
 		printf("End of game!\n\n");
 		close(clientSocket);
+		exit(-1);
 	}else if(msg_code == ROUND){
 		printf("end of round!\n");
 		int score = calculate_score();
@@ -121,7 +123,7 @@ void receive_message(int clientSocket,char** name){
 		int times = 0;
 		do{
 			if(times > 0){
-				printf("You are pleased to choose one of YOUR cards\n");
+				printf("You are kindly requested to play one of YOUR cards\n");
 				print_cards();
 			}
 			printf("What card number do you want to play ?\n");
@@ -149,7 +151,7 @@ void receive_message(int clientSocket,char** name){
 }
 
 void create_nickname(char* name){
-	char* request="Entrer votre pseudonyme (20 lettres): ";
+	char* request="Enter your nickname (20 letters): ";
 	printf("%s", request);
 	scanf("%s", name);
 	fflush(stdin);
