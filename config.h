@@ -15,6 +15,8 @@
  *
  * =====================================================================================
 */
+#ifndef _CONFIG_H
+#define _CONFIG_H
 typedef int bool;
 #define TRUE 1
 #define FALSE 0
@@ -49,3 +51,4 @@ typedef int bool;
 
 //shared-memory keys
 #define NICKNAMES_KEY "nicknames"
+#endif

@@ -17,14 +17,12 @@
  */
 #ifndef CLIENT_H
 #define CLIENT_H
-
 #include "config.h"
 #include "client.h"
 #endif
 
 #define BUFFERSIZE 1000
 
-typedef int bool;
 typedef int semaphore;
 
 int hand[DECK_SIZE];
